@@ -147,7 +147,7 @@ describe('OmniApiClient (Gemini Omni 1.1 / 1.2 Flash Interactions API)', () => {
       expect(fs.readFileSync(outVideo, 'utf8')).toBe('FAKE_MP4_BYTES');
 
       expect(interactionPayload).toBeDefined();
-      expect(interactionPayload?.model).toBe('gemini-omni-1.2-flash');
+      expect(interactionPayload?.model).toBe('gemini-omni-1.1-flash');
       expect(interactionPayload?.store).toBe(true);
       expect(interactionPayload?.response_format).toEqual({
         type: 'video',

@@ -23,6 +23,24 @@
     "button[aria-label*=\"Frame\" i]",
     "button[aria-label*=\"Image\" i]"
   ],
+  "modelSelector": [
+    "button[aria-label*=\"Model\" i]",
+    "button:has-text(\"Omni\")",
+    "button:has-text(\"Veo\")",
+    "[role=\"combobox\"][aria-label*=\"Model\" i]"
+  ],
+  "durationSelector": [
+    "button[aria-label*=\"Duration\" i]",
+    "button:has-text(\"10s\")",
+    "button:has-text(\"8s\")",
+    "button:has-text(\"5s\")"
+  ],
+  "aspectRatioSelector": [
+    "button[aria-label*=\"Aspect\" i]",
+    "button:has-text(\"9:16\")",
+    "button:has-text(\"16:9\")",
+    "button:has-text(\"Portrait\")"
+  ],
   "videoElement": [
     "video[src]",
     "video source[src]",

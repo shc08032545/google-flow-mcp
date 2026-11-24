@@ -10,7 +10,7 @@ describe('config & selectors', () => {
     expect(cfg.defaultBackend).toBe('cdp');
     expect(cfg.chromeCdpUrl).toBe('http://127.0.0.1:9222');
     expect(cfg.flowUrlMatch).toBe('flow.google.com');
-    expect(cfg.omniDefaultModel).toBe('gemini-omni-1.2-flash');
+    expect(cfg.omniDefaultModel).toBe('gemini-omni-1.1-flash');
     expect(cfg.googleApiKey).toBeUndefined();
     expect(cfg.selectors).toEqual(DEFAULT_SELECTORS);
   });

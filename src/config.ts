@@ -19,6 +19,9 @@ export const SelectorsSchema = z.object({
   generateButton: z.array(z.string().min(1)).min(1),
   fileInput: z.array(z.string().min(1)).min(1),
   attachButton: z.array(z.string().min(1)).min(1),
+  modelSelector: z.array(z.string().min(1)).optional(),
+  durationSelector: z.array(z.string().min(1)).optional(),
+  aspectRatioSelector: z.array(z.string().min(1)).optional(),
   videoElement: z.array(z.string().min(1)).min(1),
   downloadButton: z.array(z.string().min(1)).min(1),
 });
@@ -48,6 +51,24 @@ export const DEFAULT_SELECTORS: FlowSelectors = {
     'button[aria-label*="Frame" i]',
     'button[aria-label*="Image" i]',
   ],
+  modelSelector: [
+    'button[aria-label*="Model" i]',
+    'button:has-text("Omni")',
+    'button:has-text("Veo")',
+    '[role="combobox"][aria-label*="Model" i]',
+  ],
+  durationSelector: [
+    'button[aria-label*="Duration" i]',
+    'button:has-text("10s")',
+    'button:has-text("8s")',
+    'button:has-text("5s")',
+  ],
+  aspectRatioSelector: [
+    'button[aria-label*="Aspect" i]',
+    'button:has-text("9:16")',
+    'button:has-text("16:9")',
+    'button:has-text("Portrait")',
+  ],
   videoElement: ['video[src]', 'video source[src]', 'video'],
   downloadButton: ['button[aria-label*="Download" i]', 'a[download]'],
 };
@@ -70,7 +91,7 @@ const EnvSchema = z.object({
   FLOW_URL_MATCH: z.string().min(1).default('flow.google.com'),
   GOOGLE_API_KEY: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
-  OMNI_DEFAULT_MODEL: OmniModelSchema.default('gemini-omni-1.2-flash'),
+  OMNI_DEFAULT_MODEL: OmniModelSchema.default('gemini-omni-1.1-flash'),
   OMNI_API_BASE_URL: z
     .string()
     .url()
@@ -96,6 +117,11 @@ export function loadSelectors(selectorsPath?: string): FlowSelectors {
     generateButton: parsed.generateButton ?? DEFAULT_SELECTORS.generateButton,
     fileInput: parsed.fileInput ?? DEFAULT_SELECTORS.fileInput,
     attachButton: parsed.attachButton ?? DEFAULT_SELECTORS.attachButton,
+    modelSelector: parsed.modelSelector ?? DEFAULT_SELECTORS.modelSelector,
+    durationSelector:
+      parsed.durationSelector ?? DEFAULT_SELECTORS.durationSelector,
+    aspectRatioSelector:
+      parsed.aspectRatioSelector ?? DEFAULT_SELECTORS.aspectRatioSelector,
     videoElement: parsed.videoElement ?? DEFAULT_SELECTORS.videoElement,
     downloadButton: parsed.downloadButton ?? DEFAULT_SELECTORS.downloadButton,
   };

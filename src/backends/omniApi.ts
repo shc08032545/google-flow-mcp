@@ -11,6 +11,8 @@ export interface OmniGenerateParams {
   durationSeconds?: number;
   resolution?: VideoResolution;
   aspectRatio?: VideoAspectRatio;
+  /** Optional whole 2x2 storyboard sheet image to attach directly as a visual guide */
+  storyboardSheetPath?: string;
   firstFramePath?: string;
   lastFramePath?: string;
   referenceImagePaths?: string[];
@@ -233,6 +235,7 @@ export class OmniApiClient {
     }
 
     const totalImages =
+      (params.storyboardSheetPath ? 1 : 0) +
       (params.firstFramePath ? 1 : 0) +
       (params.lastFramePath ? 1 : 0) +
       (params.referenceImagePaths?.length ?? 0);
@@ -250,8 +253,20 @@ export class OmniApiClient {
     const validated = this.validateGenerateParams(params);
     const inputItems: Array<Record<string, unknown>> = [];
 
-    // Build structured prompt cues so Omni understands frame roles cleanly
+    // Build structured prompt cues so Omni understands frame / storyboard roles cleanly
     const promptLines: string[] = [params.prompt.trim()];
+
+    if (params.storyboardSheetPath) {
+      const uploaded = await this.uploadFile(params.storyboardSheetPath);
+      inputItems.push({
+        type: 'image',
+        uri: uploaded.uri,
+        mime_type: uploaded.mimeType,
+      });
+      promptLines.push(
+        'The attached Storyboard Sheet shows the 4 sequential beats (Panels 1 -> 2 -> 3 -> 4) for this single continuous video scene. Render full-frame vertical 9:16 motion following Panels 1 to 4 without rendering any 2x2 grid, split screen, timecode bars, or borders.'
+      );
+    }
 
     if (params.firstFramePath) {
       const uploaded = await this.uploadFile(params.firstFramePath);
@@ -261,7 +276,7 @@ export class OmniApiClient {
         mime_type: uploaded.mimeType,
       });
       promptLines.push(
-        'Use the first attached image strictly as the opening / start frame.'
+        'Use the attached start frame strictly as the opening frame.'
       );
     }
 
@@ -273,7 +288,7 @@ export class OmniApiClient {
         mime_type: uploaded.mimeType,
       });
       promptLines.push(
-        'Use the second attached image strictly as the closing / end frame and interpolate smoothly from the start frame to the end frame.'
+        'Use the attached end frame strictly as the closing frame and interpolate smoothly from start to end.'
       );
     }
 
@@ -407,16 +422,19 @@ export class OmniApiClient {
       );
     }
 
+    type MediaChunk = {
+      type?: string;
+      uri?: string;
+      data?: string;
+      mime_type?: string;
+      mimeType?: string;
+    };
+
     let interaction = (await createRes.json()) as {
       id?: string;
       status?: string;
-      outputs?: Array<{
-        type?: string;
-        uri?: string;
-        data?: string;
-        mime_type?: string;
-        mimeType?: string;
-      }>;
+      outputs?: MediaChunk[];
+      steps?: Array<{ content?: MediaChunk[] }>;
       error?: { message?: string; code?: number };
     };
 
@@ -461,7 +479,15 @@ export class OmniApiClient {
       );
     }
 
-    const outputs = interaction.outputs ?? [];
+    // Collect media chunks from both `outputs[]` and raw REST `steps[].content[]`
+    const stepChunks: MediaChunk[] = [];
+    for (const step of interaction.steps ?? []) {
+      if (Array.isArray(step.content)) {
+        stepChunks.push(...step.content);
+      }
+    }
+    const outputs: MediaChunk[] = [...(interaction.outputs ?? []), ...stepChunks];
+
     const videoOutput = outputs.find(
       (o) =>
         o.type === 'video' ||
@@ -469,7 +495,8 @@ export class OmniApiClient {
     );
 
     const videoUri = videoOutput?.uri;
-    const mimeType = videoOutput?.mime_type ?? videoOutput?.mimeType ?? 'video/mp4';
+    const mimeType =
+      videoOutput?.mime_type ?? videoOutput?.mimeType ?? 'video/mp4';
     let savedPath: string | undefined;
 
     if (videoOutput?.uri || videoOutput?.data) {
@@ -486,14 +513,30 @@ export class OmniApiClient {
         fs.writeFileSync(targetPath, Buffer.from(videoOutput.data, 'base64'));
         savedPath = targetPath;
       } else if (videoOutput.uri) {
-        const downloadRes = await this.fetchImpl(videoOutput.uri, {
+        let downloadUrl = videoOutput.uri;
+        // If Gemini Files API URI without :download / alt=media, prefer :download?alt=media
+        if (
+          downloadUrl.includes('/v1beta/files/') &&
+          !downloadUrl.includes(':download') &&
+          !downloadUrl.includes('alt=media')
+        ) {
+          downloadUrl = `${downloadUrl}:download?alt=media`;
+        }
+
+        let downloadRes = await this.fetchImpl(downloadUrl, {
           method: 'GET',
           headers: { 'x-goog-api-key': apiKey },
         });
+        if (!downloadRes.ok && downloadUrl !== videoOutput.uri) {
+          downloadRes = await this.fetchImpl(videoOutput.uri, {
+            method: 'GET',
+            headers: { 'x-goog-api-key': apiKey },
+          });
+        }
         if (!downloadRes.ok) {
           const errText = await downloadRes.text();
           throw new Error(
-            `Failed to download video from ${videoOutput.uri} (${downloadRes.status}): ${errText}`
+            `Failed to download video from ${downloadUrl} (${downloadRes.status}): ${errText}`
           );
         }
         const arrayBuf = await downloadRes.arrayBuffer();

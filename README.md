@@ -11,15 +11,30 @@ MCP Server ภาษา TypeScript สำหรับเชื่อม AI Agent
 
 ---
 
-## เครื่องมือ MCP ทั้งหมด (7 Tools)
+## เครื่องมือ MCP ทั้งหมด (8 Tools)
 
 1. **`flow_status`** — เช็กสถานะการเชื่อมต่อ Chrome CDP, แท็บ `flow.google.com` ที่เปิดอยู่ และความพร้อมของ `GOOGLE_API_KEY` สำหรับ Omni API
-2. **`flow_split_storyboard`** — ตัดภาพ Storyboard Sheet 9:16 แบบ 2×2 ออกเป็น 4 เฟรมสะอาด (`panel_1_start.jpg`, `panel_2.jpg`, `panel_3.jpg`, `panel_4_end.jpg`) พร้อมตัดแถบ Timecode ด้านบนและเส้นขอบกริดออกอัตโนมัติ
-3. **`flow_prepare_affiliate_pack`** — เตรียมโฟลเดอร์งานจากสกิล `motion-infographic-affiliate` ครบชุดในคำสั่งเดียว: ตัด `STORYBOARD-SCENE-01/02/03.jpg` เป็น 12 เฟรม, ดึง Prompt แยกฉากจาก `*_MASTER_PROMPT.md` เป็น `scene_01_prompt.txt`–`scene_03_prompt.txt` และสร้าง `flow_ready/manifest.json`
-4. **`flow_generate_video`** — สั่งสร้างวิดีโอผ่าน `cdp` หรือ `api` รองรับการแนบ `storyboardSheetPath` (ตัด Start+End Frame ให้อัตโนมัติ), `firstFramePath`, `lastFramePath` และ `referenceImagePaths` (Ingredients สูงสุด 6 รูป)
-5. **`flow_edit_or_extend_video`** — แก้ไขหรือต่อความยาวคลิปจาก `interactionId` เดิม (โหมด `api`, เพิ่มได้ครั้งละ 3–10 วิ สูงสุด 30 วิ)
-6. **`flow_screenshot`** — แคปหน้าจอแท็บ `flow.google.com` เพื่อตรวจสถานะการเจนหรือดีบัก UI
-7. **`flow_inspect_dom`** — ตรวจ DOM จริงของหน้า `flow.google.com` (textarea, ปุ่ม, file input, video) เพื่อปรับแก้ `selectors.json` หาก Google อัปเดตหน้าเว็บ
+2. **`flow_generate_pack_videos`** ⭐ *(แนะนำสำหรับงาน 3 ซีน)* — ส่ง **Storyboard Sheet ทั้ง 3 ซีน** (`STORYBOARD-SCENE-01/02/03.jpg`) พร้อม Prompt แยกฉากจาก `*_MASTER_PROMPT.md` ไปเจนวิดีโอ **Omni 1.1 Flash (10 วิ/ซีน, 9:16)** และ **ดาวน์โหลด `scene_01.mp4`, `scene_02.mp4`, `scene_03.mp4` กลับมาอัตโนมัติ** รองรับทั้งโหมดส่งทั้งแผ่น (`attachmentMode: "sheet"`) หรือครอป Start+End Frame (`"split_frames"`)
+3. **`flow_generate_video`** — สั่งสร้างวิดีโอทีละซีนผ่าน `cdp` หรือ `api` รองรับทั้งส่ง `storyboardSheetPath` ตรงทั้งแผ่น หรือครอป Start+End Frame อัตโนมัติ พร้อม Ingredients สูงสุด 6 รูป
+4. **`flow_split_storyboard`** — ตัดภาพ Storyboard Sheet 9:16 แบบ 2×2 ออกเป็น 4 เฟรมสะอาด (`panel_1_start.jpg`, `panel_2.jpg`, `panel_3.jpg`, `panel_4_end.jpg`) พร้อมตัดแถบ Timecode ด้านบนและเส้นขอบกริดออกอัตโนมัติ
+5. **`flow_prepare_affiliate_pack`** — เตรียมโฟลเดอร์งานจากสกิล `motion-infographic-affiliate` ครบชุดในคำสั่งเดียว: ตัด `STORYBOARD-SCENE-01/02/03.jpg` เป็น 12 เฟรม, ดึง Prompt แยกฉากจาก `*_MASTER_PROMPT.md` และสร้าง `flow_ready/manifest.json`
+6. **`flow_edit_or_extend_video`** — แก้ไขหรือต่อความยาวคลิปจาก `interactionId` เดิม (โหมด `api`, เพิ่มได้ครั้งละ 3–10 วิ สูงสุด 30 วิ)
+7. **`flow_screenshot`** — แคปหน้าจอแท็บ `flow.google.com` เพื่อตรวจสถานะการเจนหรือดีบัก UI
+8. **`flow_inspect_dom`** — ตรวจ DOM จริงของหน้า `flow.google.com` (textarea, ปุ่ม, file input, video) เพื่อปรับแก้ `selectors.json` หาก Google อัปเดตหน้าเว็บ
+
+---
+
+## รันแบบ Batch 3 ซีน × 10 วิ (Omni 1.1 Flash) จาก Terminal โดยตรง
+
+```bash
+# โหมด Google Flow Web (Chrome CDP — ใช้เครดิต Google AI Pro / Ultra)
+npm run batch -- --pack ./outputs/adda_5td40m1_20261124 --backend cdp --model gemini-omni-1.1-flash --duration 10 --mode sheet
+
+# โหมด Official Gemini Omni 1.1 Flash API (ต้องเปิด Paid Billing Tier)
+npm run batch -- --pack ./outputs/adda_5td40m1_20261124 --backend api --model gemini-omni-1.1-flash --duration 10 --mode sheet
+```
+
+ไฟล์วิดีโอที่ดาวน์โหลดกลับมาจะถูกบันทึกไว้ที่ `<packDir>/videos/scene_01.mp4`, `scene_02.mp4`, `scene_03.mp4` พร้อมสรุปใน `batch_result.json`
 
 ---
 
@@ -65,6 +80,7 @@ npm run build
         "FLOW_DEFAULT_BACKEND": "cdp",
         "CHROME_CDP_URL": "http://127.0.0.1:9222",
         "FLOW_URL_MATCH": "flow.google.com",
+        "OMNI_DEFAULT_MODEL": "gemini-omni-1.1-flash",
         "FLOW_OUTPUT_DIR": "/ABSOLUTE/PATH/TO/outputs"
       }
     }
@@ -72,9 +88,9 @@ npm run build
 }
 ```
 
-### 2. โหมด Gemini Omni 1.2 / 1.1 Flash API (`api`) — ยิง API ตรง
+### 2. โหมด Gemini Omni 1.1 / 1.2 Flash API (`api`) — ยิง API ตรง
 
-> ⚠️ **หมายเหตุ:** Gemini Omni 1.2 / 1.1 Flash (`gemini-omni-1.2-flash`, `gemini-omni-1.1-flash`) ใช้งานผ่าน Paid Gemini API Billing Tier เท่านั้น (Free Tier ยังไม่รองรับ) และเมื่อส่งทั้ง `firstFramePath` + `lastFramePath` ความยาวคลิปต้องอยู่ระหว่าง **3–10 วินาที**
+> ⚠️ **หมายเหตุ:** Gemini Omni 1.1 / 1.2 Flash (`gemini-omni-1.1-flash`, `gemini-omni-1.2-flash`) ใช้งานผ่าน **Paid Gemini API Billing Tier** เท่านั้น (Free Tier มีโควตา 0) และเมื่อส่งทั้ง `firstFramePath` + `lastFramePath` ความยาวคลิปต้องอยู่ระหว่าง **3–10 วินาที**
 
 ```json
 {
@@ -85,7 +101,7 @@ npm run build
       "env": {
         "FLOW_DEFAULT_BACKEND": "api",
         "GOOGLE_API_KEY": "AIzaSy...",
-        "OMNI_DEFAULT_MODEL": "gemini-omni-1.2-flash",
+        "OMNI_DEFAULT_MODEL": "gemini-omni-1.1-flash",
         "FLOW_OUTPUT_DIR": "/ABSOLUTE/PATH/TO/outputs"
       }
     }

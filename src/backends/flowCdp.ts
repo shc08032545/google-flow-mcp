@@ -16,9 +16,13 @@ export interface CdpStatusResult {
 
 export interface CdpGenerateParams {
   prompt: string;
+  storyboardSheetPath?: string;
   firstFramePath?: string;
   lastFramePath?: string;
   referenceImagePaths?: string[];
+  modelLabel?: string;
+  durationSeconds?: number;
+  aspectRatio?: '9:16' | '16:9';
   outputPath?: string;
   waitForCompletion?: boolean;
   timeoutMs?: number;
@@ -93,6 +97,54 @@ async function findFirstExisting(
     }
   }
   return null;
+}
+
+async function trySelectOption(
+  page: Page,
+  triggerSelectors: string[] | undefined,
+  optionTexts: string[],
+  label: string,
+  notes: string[]
+): Promise<void> {
+  if (!triggerSelectors || triggerSelectors.length === 0) return;
+
+  const trigger = await findFirstVisible(page, triggerSelectors);
+  if (!trigger) {
+    notes.push(`${label} selector not matched; keeping current Flow UI setting.`);
+    return;
+  }
+
+  const currentText = (await trigger.locator.textContent().catch(() => '')) ?? '';
+  if (
+    optionTexts.some((t) =>
+      currentText.toLowerCase().includes(t.toLowerCase())
+    )
+  ) {
+    notes.push(`${label} already active (${currentText.trim()}).`);
+    return;
+  }
+
+  await trigger.locator.click().catch(() => undefined);
+  await page.waitForTimeout(350);
+
+  for (const text of optionTexts) {
+    const option = page
+      .locator(
+        `[role="option"]:has-text("${text}"), [role="menuitem"]:has-text("${text}"), button:has-text("${text}"), li:has-text("${text}")`
+      )
+      .first();
+    if ((await option.count().catch(() => 0)) > 0 && (await option.isVisible().catch(() => false))) {
+      await option.click().catch(() => undefined);
+      await page.waitForTimeout(300);
+      notes.push(`Selected ${label}: ${text}.`);
+      return;
+    }
+  }
+
+  await page.keyboard.press('Escape').catch(() => undefined);
+  notes.push(
+    `Opened ${label} menu but none of [${optionTexts.join(', ')}] matched; verify manually or update selectors.json.`
+  );
 }
 
 export class FlowCdpClient {
@@ -187,6 +239,7 @@ export class FlowCdpClient {
   async generateVideo(params: CdpGenerateParams): Promise<CdpGenerateResult> {
     const filesToAttach: string[] = [];
     for (const maybePath of [
+      params.storyboardSheetPath,
       params.firstFramePath,
       params.lastFramePath,
       ...(params.referenceImagePaths ?? []),
@@ -214,6 +267,45 @@ export class FlowCdpClient {
       }
 
       await page.bringToFront().catch(() => undefined);
+
+      // Optional: Attempt to align Flow UI model, duration, and aspect ratio
+      if (params.modelLabel) {
+        const candidates =
+          params.modelLabel.includes('1.1')
+            ? ['Omni 1.1 Flash', 'Omni Flash 1.1', '1.1 Flash', 'Omni 1.1']
+            : params.modelLabel.includes('1.2')
+              ? ['Omni 1.2 Flash', 'Omni Flash 1.2', '1.2 Flash', 'Omni 1.2']
+              : [params.modelLabel];
+        await trySelectOption(
+          page,
+          this.selectors.modelSelector,
+          candidates,
+          'Model',
+          notes
+        );
+      }
+      if (params.durationSeconds) {
+        await trySelectOption(
+          page,
+          this.selectors.durationSelector,
+          [`${params.durationSeconds}s`, `${params.durationSeconds} sec`],
+          'Duration',
+          notes
+        );
+      }
+      if (params.aspectRatio) {
+        const ratioCandidates =
+          params.aspectRatio === '9:16'
+            ? ['9:16', 'Portrait', 'Vertical']
+            : ['16:9', 'Landscape'];
+        await trySelectOption(
+          page,
+          this.selectors.aspectRatioSelector,
+          ratioCandidates,
+          'Aspect Ratio',
+          notes
+        );
+      }
 
       // Record existing video sources before submitting so we can detect newly generated video
       const previousVideoSrcs = new Set<string>(
@@ -245,7 +337,7 @@ export class FlowCdpClient {
             );
             if (filesToAttach.length > 1) {
               notes.push(
-                `Note: file input accepts 1 file at a time; remaining ${filesToAttach.length - 1} file(s) may need a second slot (e.g. End Frame / Ingredients) in Flow UI.`
+                `Note: file input accepts 1 file at a time; remaining ${filesToAttach.length - 1} file(s) may need a second slot in Flow UI.`
               );
             }
           }
@@ -271,7 +363,7 @@ export class FlowCdpClient {
               );
             } else {
               notes.push(
-                `Clicked ${attachBtn.selector}, but no native file chooser opened. Inspect DOM with flow_inspect_dom and customize selectors.json if Flow uses a menu before upload.`
+                `Clicked ${attachBtn.selector}, but no native file chooser opened. Run flow_inspect_dom to customize selectors.json.`
               );
             }
           } else {
@@ -366,7 +458,7 @@ export class FlowCdpClient {
         };
       }
 
-      // Step 5: Attempt to save the generated video locally
+      // Step 5: Attempt to save the generated video locally (1) browser fetch, (2) Download button fallback
       let savedPath: string | undefined;
       const targetPath = path.resolve(
         params.outputPath ??
@@ -393,20 +485,44 @@ export class FlowCdpClient {
         if (base64Video) {
           fs.writeFileSync(targetPath, Buffer.from(base64Video, 'base64'));
           savedPath = targetPath;
-          notes.push(`Downloaded generated video to ${savedPath}.`);
-        } else {
-          notes.push(
-            'Detected new <video> src, but direct browser fetch was blocked by CORS/auth; download via Flow UI Download button.'
-          );
+          notes.push(`Downloaded generated video via browser fetch to ${savedPath}.`);
         }
       } catch (downloadErr) {
         notes.push(
-          `Detected new <video> src (${newVideoSrc}), auto-download skipped: ${
+          `Browser fetch skipped (${
             downloadErr instanceof Error
               ? downloadErr.message
               : String(downloadErr)
-          }`
+          }); trying Download button...`
         );
+      }
+
+      if (!savedPath) {
+        const downloadBtn = await findFirstVisible(
+          page,
+          this.selectors.downloadButton
+        );
+        if (downloadBtn) {
+          try {
+            const [download] = await Promise.all([
+              page.waitForEvent('download', { timeout: 20_000 }),
+              downloadBtn.locator.click(),
+            ]);
+            await download.saveAs(targetPath);
+            savedPath = targetPath;
+            notes.push(`Downloaded generated video via UI Download button to ${savedPath}.`);
+          } catch (btnErr) {
+            notes.push(
+              `UI Download button click did not emit file download: ${
+                btnErr instanceof Error ? btnErr.message : String(btnErr)
+              }`
+            );
+          }
+        } else {
+          notes.push(
+            'Could not auto-download video; download manually from the Flow tab or update downloadButton in selectors.json.'
+          );
+        }
       }
 
       return {
