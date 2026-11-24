@@ -1,0 +1,35 @@
+{
+  "promptInput": [
+    "textarea[placeholder*=\"Describe\" i]",
+    "textarea[placeholder*=\"Generate\" i]",
+    "textarea[placeholder*=\"Prompt\" i]",
+    "div[contenteditable=\"true\"][role=\"textbox\"]",
+    "textarea"
+  ],
+  "generateButton": [
+    "button[aria-label*=\"Generate\" i]",
+    "button[aria-label*=\"Create\" i]",
+    "button[aria-label*=\"Send\" i]",
+    "button:has-text(\"Generate\")",
+    "button[type=\"submit\"]"
+  ],
+  "fileInput": [
+    "input[type=\"file\"]"
+  ],
+  "attachButton": [
+    "button[aria-label*=\"Add\" i]",
+    "button[aria-label*=\"Upload\" i]",
+    "button[aria-label*=\"Ingredient\" i]",
+    "button[aria-label*=\"Frame\" i]",
+    "button[aria-label*=\"Image\" i]"
+  ],
+  "videoElement": [
+    "video[src]",
+    "video source[src]",
+    "video"
+  ],
+  "downloadButton": [
+    "button[aria-label*=\"Download\" i]",
+    "a[download]"
+  ]
+}
